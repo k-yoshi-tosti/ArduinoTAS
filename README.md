@@ -60,8 +60,8 @@ Select Run in the bottom left corner to flash the .hex file onto the Arduino. Wh
 
 #### Run
 
-To start a TAS file, simply start the clientTAS_GUI.py (in the Arduino/utils folder). Make sure your `port` on the last line of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it.
+To start a TAS file, simply start the clientTAS_GUI.py file (in the Arduino/utils folder). Make sure your `port` on the last line of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it.
 
 #### Thanks
 
-Thanks to MonsterDruire for the original repo, Shiny Quagsire for his [Splatoon post printer](https://github.com/shinyquagsire23/Switch-Fightstick), progmem for his [original discovery](https://github.com/progmem/Switch-Fightstick) and wchill for his [SwitchInputEmulator](https://github.com/wchill/SwitchInputEmulator), this project is based on his.
+Thanks to MonsterDruide for the original repo, Shiny Quagsire for his [Splatoon post printer](https://github.com/shinyquagsire23/Switch-Fightstick), progmem for his [original discovery](https://github.com/progmem/Switch-Fightstick) and wchill for his [SwitchInputEmulator](https://github.com/wchill/SwitchInputEmulator), this project is based on his.
