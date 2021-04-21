@@ -60,7 +60,7 @@ Select Run in the bottom left corner to flash the .hex file onto the Arduino. Wh
 
 #### Run
 
-To start a TAS file, simply start the clientTAS_GUI.py, it will run the script `script0.txt` in the same directory. Make sure your `port` on the top of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it.
+To start a TAS file, simply start the clientTAS_GUI.py (in the Arduino/utils folder). Make sure your `port` on the last line of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it.
 
 #### Thanks
 
