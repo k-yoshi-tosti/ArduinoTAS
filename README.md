@@ -60,29 +60,8 @@ Select Run in the bottom left corner to flash the .hex file onto the Arduino. Wh
 
 #### Run
 
-To start a TAS file, simply start the clientTAS.py, it will run the script `script0.txt` in the same directory. Make sure your `port` on the top of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, you can control the switch with the keyboard to do the setup for the TAS-file.The button mapping is visible below. After you are done, press ESC and see the magic happen!
-
-#### Button mapping
-
-Keyboard key | ProCon-Button
------------- | --------------
-L | A
-K | B
-J | Y
-I | X
-3 | PLUS
-1 | MINUS
-H | HOME
-C | CAPTURE
-Q | ZL
-U | ZR
-E | L
-O | R
-X | L_CLICK
-, | R_CLICK
-
-Arrows are used for DPAD-navigation, WASD controls the right stick. The special key `t` presses L and R at the same time; this is used for syncing.
+To start a TAS file, simply start the clientTAS_GUI.py, it will run the script `script0.txt` in the same directory. Make sure your `port` on the top of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it.
 
 #### Thanks
 
-Thanks to Shiny Quagsire for his [Splatoon post printer](https://github.com/shinyquagsire23/Switch-Fightstick), progmem for his [original discovery](https://github.com/progmem/Switch-Fightstick) and wchill for his [SwitchInputEmulator](https://github.com/wchill/SwitchInputEmulator), this project is based on his.
+Thanks to MonsterDruire for the original repo, Shiny Quagsire for his [Splatoon post printer](https://github.com/shinyquagsire23/Switch-Fightstick), progmem for his [original discovery](https://github.com/progmem/Switch-Fightstick) and wchill for his [SwitchInputEmulator](https://github.com/wchill/SwitchInputEmulator), this project is based on his.
