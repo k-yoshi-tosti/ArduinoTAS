@@ -6,7 +6,7 @@ import serial
 import time
 import threading
 
-PORT = "/dev/ttyUSB0"
+PORT = "COM4"
 # on windows, it should be something like "COM$" where $ is a number, check your device manager and find the USB-UART bridge to know the correct port
 # on linux, I don't really know - for me it was always /dev/ttyUSB0 or /dev/ttyUSB1
 # if the port isn't correct, you'll get an error in the python console looking like "serial.serialutil.SerialException: [Errno 2] could not open port <port>: [Errno 2] No such file or directory: '<port>'"
@@ -101,7 +101,7 @@ def decrypt_dpad(dpad):
 		dpadDecrypt = A_DPAD_CENTER
 	return dpadDecrypt
 
-	
+
 def toValidJoy(value):
 	return 128-int(int(value)/256)
 
@@ -156,7 +156,7 @@ class ArduinoSerial:
 		self.wait_for_data()
 		byte_in = self.read_byte_latest()
 		print (byte_in)
-		
+
 		while not self.force_stop and (byte_in == 0x00 or byte_in == 0x88):
 			print ("INTERRUPTED1")
 			self.write_bytes([0xFF] * 9)
@@ -207,7 +207,7 @@ class ArduinoSerial:
 
 	def run_inputs(self, inputs, waitFrames = 5, callback = None):
 		frameno = -waitFrames
-		
+
 		self.force_stop = False
 		last = time.perf_counter()
 		self.discard_all()
@@ -333,9 +333,7 @@ class ArduinoSerial:
 		self.force_stop = True
 		time.sleep(0.5)
 		self.send_cmd()
-		while self.read_byte() != 0x38:
-			pass
-
+		time.sleep(0.5)
 		self.ser.close()
 
 class Script:
@@ -463,7 +461,7 @@ class MainGUI:
 			self.serial.force_stop = True
 			self.sync_label.config(text = "Sync failed")
 			self.is_syncing = False
- 
+
 			self.sync_button.config(text = "Sync")
 
 	def sync_finished(self, state):
@@ -500,7 +498,7 @@ class MainGUI:
 		self.vsync_entry = Text(self.vsync_frame, width = 50, height = 16)
 		self.vsync_entry.grid(row = 0, column = 0, sticky = "NSEW")
 		self.vsync_entry.insert(END, "These values should be around 120\n(values between 117-123 should work)\nand they should be printed every two seconds.\nIf not, check your setup and\nespecially the connection to the VGA port.\n")
-		
+
 		vsync_scroll = Scrollbar(self.vsync_frame, orient = VERTICAL,
 			command = lambda op, val, units = None: self.vsync_entry.yview_scroll(val, units) if op == "scroll" else self.vsync_entry.yview_moveto(val))
 		vsync_scroll.grid(row = 0, column = 1, sticky = "NS")
@@ -567,8 +565,9 @@ def countVSyncs():
 		byte_in = ser.read_byte()
 		if(byte_in==0x38):
 			counter+=1
-	
+
 
 if __name__ == "__main__":
 	m = MainGUI(PORT)
 	#countVSyncs()
+	
