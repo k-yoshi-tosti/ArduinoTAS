@@ -6,7 +6,10 @@ import serial
 import time
 import threading
 
-#import clientTAS
+PORT = "/dev/ttyUSB0"
+# on windows, it should be something like "COM$" where $ is a number, check your device manager and find the USB-UART bridge to know the correct port
+# on linux, I don't really know - for me it was always /dev/ttyUSB0 or /dev/ttyUSB1
+# if the port isn't correct, you'll get an error in the python console looking like "serial.serialutil.SerialException: [Errno 2] could not open port <port>: [Errno 2] No such file or directory: '<port>'"
 
 # Commands to send to MCU
 COMMAND_NOP        = 0x00
@@ -141,10 +144,13 @@ class ArduinoSerial:
 	def __init__(self, port):
 		self.ser = serial.Serial(port = port, baudrate = 19200, timeout = 1)
 
+		if not self.ser.is_open:
+			self.ser.open()
+
 		self.force_stop = False
 
 	def sync(self, callback = None):
-		print ("syncing rn")
+		print ("syncing...")
 		self.write_bytes([0xFF] * 9)
 
 		self.wait_for_data()
@@ -186,19 +192,26 @@ class ArduinoSerial:
 
 				if not self.force_stop and byte_in == RESP_SYNC_OK:
 					self.write_byte(COMMAND_SYNC_DONE)
+					in_sync = self.send_packet()
 					if callback:
 						return callback(True)
 					else:
 						return True
 
 		self.force_stop = False
+
 		if callback:
 			return callback(False)
 		else:
 			return False
 
-	def run_inputs(self, inputs, waitFrames = 0, callback = None):
+	def run_inputs(self, inputs, waitFrames = 5, callback = None):
 		frameno = -waitFrames
+		
+		self.force_stop = False
+		last = time.perf_counter()
+		self.discard_all()
+		#print (self.ser.in_waiting)	# should be 0
 
 		for frame in inputs:
 			while frameno < frame[0] and not self.force_stop:
@@ -224,13 +237,18 @@ class ArduinoSerial:
 
 			self.send_cmd(command, toValidJox(frame[2][0]), toValidJoy(frame[2][1]), toValidJox(frame[3][0]), toValidJoy(frame[3][1]))
 
+			byte_in = self.read_byte()
+			nb = 0
+			while byte_in != 0x38:
+				byte_in = self.read_byte()
+				nb += 1
+
 			if callback and not frameno % self.callbackMinElapsedFrames:
 				callback(frameno)
 			frameno += 1
 
-			byte_in = self.read_byte()
-			while byte_in != 0x38:
-				byte_in = self.read_byte()
+			#print (frameno, nb, time.perf_counter() - last)
+			last = time.perf_counter()
 
 		self.send_cmd()
 		if callback:
@@ -283,11 +301,42 @@ class ArduinoSerial:
 			return bytes_in[0]
 		return 0
 
+	def discard_all(self):
+		#while self.ser.in_waiting:
+		#	self.ser.read(self.ser.in_waiting)
+		self.ser.reset_input_buffer()
+
 	def write_bytes(self, bytes_out):
 		self.ser.write(bytearray(bytes_out))
 
 	def write_byte(self, byte_out):
 		self.write_bytes([byte_out])
+
+	def countvsync(self, callback):
+		self.discard_all()
+
+		start = time.perf_counter()
+		counter = 0
+		while not self.force_stop:
+			if time.perf_counter() >= start + 2:
+				start = time.perf_counter()
+				callback(counter)
+				counter = 0
+
+			byte_in = self.read_byte()
+			if byte_in == 0x38:
+				counter += 1
+
+		self.force_stop = False
+
+	def close(self):
+		self.force_stop = True
+		time.sleep(0.5)
+		self.send_cmd()
+		while self.read_byte() != 0x38:
+			pass
+
+		self.ser.close()
 
 class Script:
 	def __init__(self, filename = '', inputs = []):
@@ -342,38 +391,49 @@ class Script:
 			self.inputs = inputs
 
 		self.inputs.sort()
-		self.nb_frames = self.inputs[-1][0]
+		if self.inputs:
+			self.nb_frames = self.inputs[-1][0]
+		else:
+			self.nb_frames = 0
+
+	def shiftFrames(self, shift):
+		return Script(inputs = list(map(lambda frame: (frame[0] + shift,) + frame[1:], self.inputs)))
 
 class MainGUI:
-	def __init__(self, port = "/dev/ttyUSB0"):
+	def __init__(self, port):
 		self.f = Tk()
 		self.f.title("Arduino TAS GUI")
 
 		self.serial = ArduinoSerial(port)
 
-		self.sync_frame = Frame(self.f)
-		self.sync_frame.pack()
+		self.f.protocol("WM_DELETE_WINDOW", self.on_close)
+
+		self.sync_frame = Frame(self.f, borderwidth = 2, relief = "groove")
+		self.sync_frame.grid(row = 0, column = 0, padx = 10, pady = 13)
 
 		self.sync_button = Button(self.sync_frame, text = "Sync", command = self.sync)
-		self.sync_button.grid(row = 0, column = 0)
+		self.sync_button.grid(row = 0, column = 0, padx = 7, pady = 5)
 
 		self.sync_label = Label(self.sync_frame, text = "Not synchronized")
-		self.sync_label.grid(row = 0, column = 1)
+		self.sync_label.grid(row = 0, column = 1, padx = 7, pady = 5)
 
-		self.script_frame = Frame(self.f)
-		self.script_frame.pack()
+		self.script_frame = Frame(self.f, borderwidth = 2, relief = "groove")
+		self.script_frame.grid(row = 1, column = 0, padx = 10, pady = 13)
 
 		self.open_script_button = Button(self.script_frame, text = "Open script", command = self.open_script)
-		self.open_script_button.grid(row = 0, column = 0)
+		self.open_script_button.grid(row = 0, column = 0, padx = 7, pady = 5)
 
 		self.run_script_button = Button(self.script_frame, text = "Run script", command = self.run_script)
-		self.run_script_button.grid(row = 0, column = 1)
+		self.run_script_button.grid(row = 0, column = 1, padx = 7, pady = 5)
 
 		self.script_filename_label = Label(self.script_frame, text = "No script")
-		self.script_filename_label.grid(row = 1, column = 0, columnspan = 2)
+		self.script_filename_label.grid(row = 1, column = 0, columnspan = 2, padx = 6, pady = 10)
 
 		self.script_frame_number_label = Label(self.script_frame, text = "Frame - / -")
-		self.script_frame_number_label.grid(row = 2, column = 0, columnspan = 2)
+		self.script_frame_number_label.grid(row = 2, column = 0, columnspan = 2, padx = 6, pady = 5)
+
+		self.test_vsync_button = Button(self.f, text = "Test V-sync", command = self.test_vsync)
+		self.test_vsync_button.grid(row = 2, column = 0, padx = 10, pady = 13)
 
 		self.script = []
 
@@ -382,9 +442,16 @@ class MainGUI:
 		self.synced = False
 		self.is_syncing = False
 
+		self.is_vsync_testing = False
+
 		self.f.mainloop()
 
 	def sync(self):
+		if self.is_running:
+			return showerror("Error", "Already running a script")
+		if self.is_vsync_testing:
+			return showerror("Error", "Testing v-sync")
+
 		if not self.is_syncing:
 			sync_thread = threading.Thread(target = self.serial.sync, args = (self.sync_finished,))
 			sync_thread.start()
@@ -405,9 +472,54 @@ class MainGUI:
 		self.synced = state
 		self.sync_button.config(text = "Sync")
 
+	def on_close(self):
+		self.serial.close()
+		self.f.destroy()
+
+	def test_vsync(self):
+		if self.is_syncing or not self.synced:
+			return showerror("Error", "Not synced")
+
+		if self.is_running:
+			return showerror("Error", "Already running a script")
+
+		if self.is_vsync_testing:
+			self.serial.force_stop = True
+			self.vsync_frame.destroy()
+			self.is_vsync_testing = False
+
+			self.test_vsync_button.config(text = "Test V-sync")
+			return
+
+		self.test_vsync_button.config(text = "Stop test")
+		self.is_vsync_testing = True
+
+		self.vsync_frame = Frame(self.f)
+		self.vsync_frame.grid(row = 0, column = 1, rowspan = 3, padx = 10, pady = 13, sticky = "EW")
+
+		self.vsync_entry = Text(self.vsync_frame, width = 50, height = 16)
+		self.vsync_entry.grid(row = 0, column = 0, sticky = "NSEW")
+		self.vsync_entry.insert(END, "These values should be around 120\n(values between 117-123 should work)\nand they should be printed every two seconds.\nIf not, check your setup and\nespecially the connection to the VGA port.\n")
+		
+		vsync_scroll = Scrollbar(self.vsync_frame, orient = VERTICAL,
+			command = lambda op, val, units = None: self.vsync_entry.yview_scroll(val, units) if op == "scroll" else self.vsync_entry.yview_moveto(val))
+		vsync_scroll.grid(row = 0, column = 1, sticky = "NS")
+
+		self.vsync_entry.config(yscrollcommand = vsync_scroll.set, state = DISABLED)
+
+		vsync_thread = threading.Thread(target = self.serial.countvsync, args = (self.vsync_update,))
+		vsync_thread.start()
+
+	def vsync_update(self, val):
+		self.vsync_entry.config(state = NORMAL)
+		self.vsync_entry.insert(END, str(val) + '\n')
+		self.vsync_entry.config(state = DISABLED)
+
 	def run_script(self):
 		if self.is_syncing or not self.synced:
 			return showerror("Error", "Not synced")
+		if self.is_vsync_testing:
+			return showerror("Error", "Testing v-sync")
 
 		if not self.is_running:
 			run_thread = threading.Thread(target = self.serial.run_inputs, args = (self.script.inputs, 5, self.run_update))
@@ -438,5 +550,25 @@ class MainGUI:
 			self.script_filename_label.config(text = "Loaded script: " + filename)
 			self.script_frame_number_label.config(text = "Frame - / " + str(self.script.nb_frames))
 
+def countVSyncs():
+	p = time.perf_counter()
+	ser = ArduinoSerial(PORT)
+
+	if not ser.sync():
+		print('Could not sync!')
+		sys.exit()
+	start = time.perf_counter();
+	counter=0
+	while time.perf_counter() - p < 30:
+		if(time.perf_counter() >= start+2):
+			start=time.perf_counter();
+			print(counter);
+			counter=0
+		byte_in = ser.read_byte()
+		if(byte_in==0x38):
+			counter+=1
+	
+
 if __name__ == "__main__":
-	m = MainGUI("/dev/ttyUSB1")
+	m = MainGUI(PORT)
+	#countVSyncs()

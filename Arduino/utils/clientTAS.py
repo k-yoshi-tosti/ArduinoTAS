@@ -9,6 +9,8 @@ import math
 from pynput.keyboard import Key,Listener
 from pynput import keyboard
 
+PORT = "/dev/ttyUSB1"
+
 STATE_OUT_OF_SYNC   = 0
 STATE_SYNC_START    = 1
 STATE_SYNC_1        = 2
@@ -484,7 +486,8 @@ def on_press(key):
     current.add(key)
 
 def on_release(key):
-    current.remove(key)
+    if key in current:
+        current.remove(key)
     if key == Key.esc:
         # Stop listener
         return False
@@ -516,7 +519,7 @@ def main():
             if(key == keyboard.KeyCode(char='l')):
                 command += BTN_A
                 keys+=";KEY_A"
-            if(key == keyboard.KeyCode(char='k'):
+            if(key == keyboard.KeyCode(char='k')):
                 command += BTN_B
                 keys+=";KEY_B"
             if(key == keyboard.KeyCode(char='j')):
@@ -608,8 +611,10 @@ def main():
     if 'f' in locals():
         f.close()
     frameNo = -3
-    f = open("script0.txt","r")
+    f = open("script1.txt","r")
     f1 = f.readlines();
+    last = time.perf_counter()
+
     for line in f1:
         parts = line.split(" ")
         while frameNo != int(parts[0]):
@@ -620,16 +625,22 @@ def main():
                 byte_in = read_byte();
             frameNo+=1
 
-        print(frameNo)
+        #print(frameNo)
+
         com = pressKeys(parts[1])
         left = parts[2].split(";")
         right = parts[3].split(";")
         send_cmd(com,toValidJox(left[0]),toValidJoy(left[1]),toValidJox(right[0]),toValidJoy(right[1]))
     
-        frameNo+=1
         byte_in = read_byte();
+        nb = 0
         while(byte_in!=0x38):
             byte_in = read_byte(); #   1/120
+            nb += 1
+
+        print (frameNo, nb, time.perf_counter() - last)
+        last = time.perf_counter()
+        frameNo+=1
 
     send_cmd(pressKeys(""),128,128,128,128)
     # testbench()
@@ -655,6 +666,7 @@ def countVSyncs():
 # ser = serial.Serial(port=args.port, baudrate=31250,timeout=1)
 # ser = serial.Serial(port=args.port, baudrate=40000,timeout=1)
 # ser = serial.Serial(port=args.port, baudrate=62500,timeout=1)
-ser = serial.Serial(port="COM4", baudrate=19200,timeout=1)
+ser = serial.Serial(port=PORT, baudrate=19200,timeout=1)
 main()
-ser.close
+#countVSyncs()
+ser.close()
