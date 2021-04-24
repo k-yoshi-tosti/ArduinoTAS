@@ -435,7 +435,7 @@ class MainGUI:
 		self.test_vsync_button = Button(self.f, text = "Test V-sync", command = self.test_vsync)
 		self.test_vsync_button.grid(row = 2, column = 0, padx = 10, pady = 13)
 
-		self.script = []
+		self.script = Script()
 
 		self.is_running = False
 
