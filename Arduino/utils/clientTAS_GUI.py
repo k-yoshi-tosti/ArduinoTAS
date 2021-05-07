@@ -6,10 +6,12 @@ import serial
 import time
 import threading
 
-PORT = "COM4"
+PORT = "/dev/ttyUSB0"
 # on windows, it should be something like "COM$" where $ is a number, check your device manager and find the USB-UART bridge to know the correct port
 # on linux, I don't really know - for me it was always /dev/ttyUSB0 or /dev/ttyUSB1
 # if the port isn't correct, you'll get an error in the python console looking like "serial.serialutil.SerialException: [Errno 2] could not open port <port>: [Errno 2] No such file or directory: '<port>'"
+
+DEBUG = False
 
 # Commands to send to MCU
 COMMAND_NOP        = 0x00
@@ -141,16 +143,28 @@ def crc8_ccitt(old_crc, new_data):
 
 class ArduinoSerial:
 	callbackMinElapsedFrames = 20		# the callback function will be called every 20 frames to prevent lag
-	def __init__(self, port):
+
+	def __init__(self, port, debug = False):
 		self.ser = serial.Serial(port = port, baudrate = 19200, timeout = 1)
 
 		if not self.ser.is_open:
 			self.ser.open()
 
 		self.force_stop = False
+		self.debug = debug
 
-	def sync(self, callback = None):
+		self.communication = []			# positive integers are the bytes sent from the arduino to the switch, negative integers are the byte sent from the switch to the arduino minus one (ie -2 means that 0x1 was received)
+
+	def sync(self, callback = None, try_reconnection = True):
 		print ("syncing...")
+
+		if try_reconnection and self.send_packet():
+			if callback:
+				return callback(True)
+			else:
+				return True
+
+
 		self.write_bytes([0xFF] * 9)
 
 		self.wait_for_data()
@@ -194,12 +208,12 @@ class ArduinoSerial:
 					self.write_byte(COMMAND_SYNC_DONE)
 					in_sync = self.send_packet()
 					if callback:
-						return callback(True)
+						return callback(in_sync)
 					else:
-						return True
+						return in_sync
 
 		self.force_stop = False
-
+		
 		if callback:
 			return callback(False)
 		else:
@@ -254,12 +268,11 @@ class ArduinoSerial:
 		if callback:
 			callback(-1)
 
-
 	def send_cmd(self, command = 0, left_x = 128, left_y = 128, right_x = 128, right_y = 128):
 		success = self.send_packet(cmd_to_packet(command, left_x, left_y, right_x, right_y))
 		return success
 
-	def send_packet(self, packet = [0x00,0x00,0x08,0x80,0x80,0x80,0x80,0x00]):
+	def send_packet(self, packet = [0x00,0x00,0x08,0x80,0x80,0x80,0x80,0x00], wait_for_answer = True):
 		bytes_out = packet[:]
 
 		crc = 0
@@ -274,16 +287,18 @@ class ArduinoSerial:
 
 		return byte_in == RESP_USB_ACK
 
-	def wait_for_data(self, timout = 1.0, sleepTime = 0.1):
+	def wait_for_data(self, timeout = 1.0, sleepTime = 0.1):
 		t1 = t0 = time.perf_counter()
 		inWaiting = self.ser.in_waiting
-		while not self.force_stop and (t1 - t0 < sleepTime or inWaiting == 0):
+		while not self.force_stop and (t1 - t0 < timeout) and (t1 - t0 < sleepTime or inWaiting == 0):
 			time.sleep(sleepTime)
 			inWaiting = self.ser.in_waiting
 			t1 = time.perf_counter()
 
 	def read_bytes(self, size):
 		bytes_in = self.ser.read(size)
+		if self.debug:
+			self.communication.extend(-byte for byte in bytes_in)
 		return list(bytes_in)
 
 	def read_byte(self):
@@ -307,6 +322,7 @@ class ArduinoSerial:
 		self.ser.reset_input_buffer()
 
 	def write_bytes(self, bytes_out):
+		self.communication.extend(bytes_out)
 		self.ser.write(bytearray(bytes_out))
 
 	def write_byte(self, byte_out):
@@ -332,9 +348,11 @@ class ArduinoSerial:
 	def close(self):
 		self.force_stop = True
 		time.sleep(0.5)
-		self.send_cmd()
-		time.sleep(0.5)
-		self.ser.close()
+		try:
+			self.send_cmd()
+		finally:
+			time.sleep(0.5)
+			self.ser.close()
 
 class Script:
 	def __init__(self, filename = '', inputs = []):
@@ -398,11 +416,12 @@ class Script:
 		return Script(inputs = list(map(lambda frame: (frame[0] + shift,) + frame[1:], self.inputs)))
 
 class MainGUI:
-	def __init__(self, port):
+	communication_update_time = 500			# refresh time, in milliseconds
+	def __init__(self, port, debug = False):
 		self.f = Tk()
 		self.f.title("Arduino TAS GUI")
 
-		self.serial = ArduinoSerial(port)
+		self.serial = ArduinoSerial(port, debug)
 
 		self.f.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -432,6 +451,40 @@ class MainGUI:
 
 		self.test_vsync_button = Button(self.f, text = "Test V-sync", command = self.test_vsync)
 		self.test_vsync_button.grid(row = 2, column = 0, padx = 10, pady = 13)
+
+		if debug:
+			self.debug_frame = Frame(self.f, borderwidth = 2, relief = "groove")
+			self.debug_frame.grid(row = 0, column = 2, padx = 10, pady = 13, rowspan = 3)
+
+			self.debug_text = Text(self.debug_frame, width = 100, height = 30, wrap = WORD)
+			self.debug_text.grid(row = 0, column = 0, padx = 10, pady = 13, sticky = "NSEW")
+
+			debug_scroll = Scrollbar(self.debug_frame, orient = VERTICAL, command = lambda op, val, units = None: self.debug_text.yview_scroll(val, units) if op == "scroll" else self.debug_text.yview_moveto(val))
+			debug_scroll.grid(row = 0, column = 1, sticky = "NS")
+
+			self.debug_text.tag_config("received", foreground = "#FF0000")
+			self.debug_text.tag_config("sent", foreground = "#0000FF")
+
+			self.debug_text.insert(END, "Bytes sent will be in ")
+			self.debug_text.insert(END, "blue", ("sent", ))
+			self.debug_text.insert(END, " and bytes received will be in ")
+			self.debug_text.insert(END, "red", ("received", ))
+
+			self.debug_text.config(yscrollcommand = debug_scroll.set, state = DISABLED)
+
+			buttons_frame = Frame(self.debug_frame)
+			buttons_frame.grid(row = 1, column = 0, columnspan = 2, padx = 10, pady = 13)
+
+			debug_button = Button(buttons_frame, text = "Switch debug", command = self.debug_switch)
+			debug_button.grid(row = 0, column = 0, padx = 10, pady = 13)
+
+			clear_button = Button(buttons_frame, text = "Clear", command = self.debug_clear)
+			clear_button.grid(row = 0, column = 1, padx = 10, pady = 13)
+
+			self.communication_refresh = True
+
+			self.last_sent = "none"		# the type of the last communication byte ("sent", "received" or any other value) to know whether to insert a newline character
+			self.f.after(self.communication_update_time, self.communication_update)
 
 		self.script = Script()
 
@@ -513,6 +566,37 @@ class MainGUI:
 		self.vsync_entry.insert(END, str(val) + '\n')
 		self.vsync_entry.config(state = DISABLED)
 
+	def communication_update(self):
+		if not self.communication_refresh:
+			return self.f.after(self.communication_update_time, self.communication_update)
+
+		self.debug_text.config(state = NORMAL)
+
+		bytes_list = self.serial.communication[:]
+		self.serial.communication = []
+
+		for byte in bytes_list:
+			tp = ("received", "sent")[byte >= 0]
+			if tp != self.last_sent:
+				self.debug_text.insert(END, "\n")
+			if byte < 0:
+				byte = -byte - 1
+			self.last_sent = tp
+			self.debug_text.insert(END, hex(byte)[2:].upper().zfill(2) + ' ', (tp, ))
+
+		self.debug_text.see(END)
+		self.debug_text.config(state = DISABLED)
+
+		self.f.after(self.communication_update_time, self.communication_update)
+
+	def debug_switch(self):
+		self.communication_refresh = not self.communication_refresh
+
+	def debug_clear(self):
+		self.debug_text.config(state = NORMAL)
+		self.debug_text.delete("1.0", END)
+		self.debug_text.config(state = DISABLED)
+
 	def run_script(self):
 		if self.is_syncing or not self.synced:
 			return showerror("Error", "Not synced")
@@ -568,6 +652,6 @@ def countVSyncs():
 
 
 if __name__ == "__main__":
-	m = MainGUI(PORT)
+	m = MainGUI(PORT, debug = DEBUG)
 	#countVSyncs()
 	

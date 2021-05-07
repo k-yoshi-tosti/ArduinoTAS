@@ -9,7 +9,7 @@ import math
 from pynput.keyboard import Key,Listener
 from pynput import keyboard
 
-PORT = "/dev/ttyUSB1"
+PORT = "/dev/ttyUSB0"
 
 STATE_OUT_OF_SYNC   = 0
 STATE_SYNC_START    = 1
