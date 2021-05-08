@@ -5,12 +5,14 @@ from tkinter.filedialog import *
 import serial
 import time
 import threading
+import sys 	
 
-PORT = "/dev/ttyUSB0"
+#PORT = "/dev/ttyUSB0"
+PORT = "automatic"
 # on windows, it should be something like "COM$" where $ is a number, check your device manager and find the USB-UART bridge to know the correct port
 # on linux, I don't really know - for me it was always /dev/ttyUSB0 or /dev/ttyUSB1
 # if the port isn't correct, you'll get an error in the python console looking like "serial.serialutil.SerialException: [Errno 2] could not open port <port>: [Errno 2] No such file or directory: '<port>'"
-
+PORTS = {"windows": ("COM1", "COM2", "COM3", "COM4", "COM5"), "linux": ("/dev/ttyUSB0", "/dev/ttyUSB1")}
 DEBUG = False
 
 # Commands to send to MCU
@@ -140,6 +142,16 @@ def crc8_ccitt(old_crc, new_data):
 			data = data << 1
 		data = data & 0xff
 	return data
+
+def isPortOpen(port):
+	# bad method
+	try:
+		ser = serial.Serial(port = port)
+	except serial.serialutil.SerialException:
+		return False
+	else:
+		ser.close()
+		return True
 
 class ArduinoSerial:
 	callbackMinElapsedFrames = 20		# the callback function will be called every 20 frames to prevent lag
@@ -347,11 +359,11 @@ class ArduinoSerial:
 
 	def close(self):
 		self.force_stop = True
-		time.sleep(0.5)
+		time.sleep(0.25)
 		try:
 			self.send_cmd()
 		finally:
-			time.sleep(0.5)
+			time.sleep(0.25)
 			self.ser.close()
 
 class Script:
@@ -421,7 +433,17 @@ class MainGUI:
 		self.f = Tk()
 		self.f.title("Arduino TAS GUI")
 
-		self.serial = ArduinoSerial(port, debug)
+		if port == "automatic":
+			self.set_port_auto()
+		else:
+			self.port = port
+
+		try:
+			self.serial = ArduinoSerial(self.port, debug)
+		except:
+			self.serial_opened = False
+		else:
+			self.serial_opened = True
 
 		self.f.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -433,6 +455,9 @@ class MainGUI:
 
 		self.sync_label = Label(self.sync_frame, text = "Not synchronized")
 		self.sync_label.grid(row = 0, column = 1, padx = 7, pady = 5)
+
+		self.port_label = Label(self.sync_frame, text = "Port: " + str(self.port))
+		self.port_label.grid(row = 1, column = 0, columnspan = 2, padx = 7, pady = 5)
 
 		self.script_frame = Frame(self.f, borderwidth = 2, relief = "groove")
 		self.script_frame.grid(row = 1, column = 0, padx = 10, pady = 13)
@@ -498,6 +523,8 @@ class MainGUI:
 		self.f.mainloop()
 
 	def sync(self):
+		if not self.serial_opened:
+			return showerror("Error", "Failed to open the serial connection")
 		if self.is_running:
 			return showerror("Error", "Already running a script")
 		if self.is_vsync_testing:
@@ -523,9 +550,34 @@ class MainGUI:
 		self.synced = state
 		self.sync_button.config(text = "Sync")
 
+	def set_port_auto(self):
+		if sys.platform == "win32":
+			candidates = PORTS["windows"]
+		elif sys.platform.startswith("linux"):
+			candidates = PORTS["linux"]
+		else:
+			candidates = PORTS["windows"] + PORTS["linux"]
+
+		open_ports = []
+
+		for candidate in candidates:
+			if isPortOpen(candidate):
+				open_ports.append(candidate)
+
+		if len(open_ports) == 0:
+			self.port = None
+		elif len(open_ports) == 1:
+			self.port = open_ports[0]
+		else:
+			showwarning("Warning", "Found several valid ports (" + ", ".join('"' + port + '"' for port in open_ports) + "), choosing " + open_ports[0])
+			self.port = open_ports[0]
+
 	def on_close(self):
-		self.serial.close()
-		self.f.destroy()
+		try:
+			if self.serial_opened:
+				self.serial.close()
+		finally:
+			self.f.destroy()
 
 	def test_vsync(self):
 		if self.is_syncing or not self.synced:
