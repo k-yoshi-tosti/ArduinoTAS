@@ -15,20 +15,24 @@ The original version of the code that this repo is based off of emulated the Pok
 #### Prerequisites
 * A LUFA-compatible microcontroller such as the Teensy 2.0++, Arduino UNO R3, or the Arduino Micro
 * A USB-to-UART adapter. In a pinch, an Arduino UNO R3 with the ATMega328p disabled (connect RESET to GND) will work.
-* A machine running Windows. Running on Linux or Mac could also be possible, but hasn't been tested.
+* A machine running Windows or Linux. Mac should also be possible, but hasn't been tested.
 
 #### How to use
 
 Besides the Arduino you also need an UART to USB-Bridge. [This one](https://www.amazon.de/USB-TTL-Konverter-Modul-mit-eingebautem-CP2102/dp/B00AFRXKFU/) from Amazon works for me. You also need an HDMI- to VGA-Adapter and either a HDMI or VGA splitter to still view the output of the Switch while running the task; If your capture card has an mirroring output that works too.
 
-First, you need to connect TX to TX and RX to RX. Normally, you connect TX to RX, but we are using the ATmega16u2 in the Arduino, which inverses TX and RX.
+First, you need to connect TX (pin 1 of the Arduino) to TXD (on the USB-UART bridge) and RX to RXD. Normally, you connect TX to RX, but we are using the ATmega16u2 in the Arduino, which inverses TX and RX.
 
 Next, you have to wire the arduino to the VGA-output of the Switch. You need to connect PIN14 of the VGA-Connector to PIN3 of the first ICSP header (MISO-Pin, look at image below).
 
-[![VGA-Adapter -> Connect PIN14](http://distrikt12.bplaced.net/web_old/VGA.jpg)](http://distrikt12.bplaced.net/web_old/VGA.jpg)
-[![Arduino connections](http://distrikt12.bplaced.net/web_old/Arduino.jpg)](http://distrikt12.bplaced.net/web_old/Arduino.jpg)
+![Arduino connections](/docs/images/IMG_20210518_114708.jpg)
+![VGA connection](/docs/images/IMG_20210518_114747.jpg)
+![Bridge connections](/docs/images/IMG_20210518_114853.jpg)
 
-After connecting the bridge to your PC, you need to check, which COM-Port it uses. Go into your "Device Manager" and check below "COM & LPT" for "Silicon Labs CP210x USB to UART Bridge (COM?)" (for my device, linked above). That ? after COM is your needed COM port. Insert it into the "port" on the top of "clientTAS.py".
+On these pictures, the blue cables are VGA-related, the red and white wires are TX-related and the black wires are RX-related.
+
+After connecting the bridge to your PC, you can check which COM-Port it uses. Go into your "Device Manager" and check below "COM & LPT" for "Silicon Labs CP210x USB to UART Bridge (COM?)" (for my device, linked above). That ? after COM is your needed COM port.
+Note that the GUI should automatically detect the correct COM port.
 
 In case you see issues with controller conflicts while in docked mode, try using a USB-C to USB-A adapter in handheld mode. In dock mode, changes in the HDMI connection will briefly make the Switch not respond to incoming USB commands, skipping parts of the sequence. These changes may include turning off the TV, or switching the HDMI input. (Switching to the internal tuner will be OK, if this doesn't trigger a change in the HDMI input.)
 
@@ -36,7 +40,7 @@ This repository has been tested using an Arduino Uno.
 
 #### Compiling this Project
 
-First of all, you need a Linux VM (for example in [VirtualBox](https://www.virtualbox.org/), tested with Ubuntu). Here you need to install the [ArduinoIDE](https://www.arduino.cc/download_handler.php?f=/arduino-1.8.10-linux64.tar.xz). Next, you edit the makefile and insert your installation dir at ARDUINO_PATH (keep the additions at the end to let it point to the correct dir).
+First of all, you need a Linux VM (for example in [VirtualBox](https://www.virtualbox.org/), tested with Ubuntu) or computer running Linux. Here you need to install the [ArduinoIDE](https://www.arduino.cc/download_handler.php?f=/arduino-1.8.10-linux64.tar.xz). Next, you edit the makefile and insert your installation dir at ARDUINO_PATH (keep the additions at the end to let it point to the correct dir).
 
 After every restart of the Linux VM you need to extend the $PATH-Variable by running the following command: `sudo export $PATH=(your ArduinoIDE-Installation-dir)/hardware/tools/avr/bin/:$PATH` (also look if it points to an existing directory).
 
@@ -45,6 +49,7 @@ Now you should be ready to rock. Open a terminal window in the `Arduino`-subdire
 #### Flashing it onto the Arduino Uno
 
 You need the program called `Flip` on your Windows PC to flash the compiled `Joystick.hex` file onto your Arduino. You can download it [here](https://www.microchip.com/developmenttools/ProductDetails/flip).
+On Linux, after doing the following steps, running `make flash` (using `sudo` might be necessary) in the `Arduino`-subdirectory should automatically flash the hex file on your Arduino. If you encounter problems, you can use the `dfu-programmer` command to flash hex files.
 
 Before flashing, you always need to disconnect your TX and RX-Pins.
 
@@ -60,7 +65,9 @@ Select Run in the bottom left corner to flash the .hex file onto the Arduino. Wh
 
 #### Run
 
-To start a TAS file, simply start the clientTAS_GUI.py file (in the Arduino/utils folder). Make sure your `PORT` in the beginning of that file is correct and the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it. You can also test the V-sync to check if everything is working correctly.
+To start a TAS file, simply start the clientTAS_GUI.py file (in the Arduino/utils folder). Make sure the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it. You can also test the V-sync to check if everything is working correctly.
+
+If you have trouble setting up everything or running scripts, feel free to ask on the [Switch TAS discord server](https://discord.gg/KsqbP6k8Sj).
 
 #### Thanks
 
