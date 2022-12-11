@@ -29,7 +29,7 @@ Next, you have to wire the arduino to the VGA-output of the Switch. You need to 
 ![VGA connection](/docs/images/IMG_20210518_114747.jpg)
 ![Bridge connections](/docs/images/IMG_20210518_114853.jpg)
 
-On these pictures, the blue cables are VGA-related, the red and white wires are TX-related and the black wires are RX-related.
+On these pictures, the blue wires are VGA-related, the red and white wires are TX-related and the black wires are RX-related.
 
 After connecting the bridge to your PC, you can check which COM-Port it uses. Go into your "Device Manager" and check below "COM & LPT" for "Silicon Labs CP210x USB to UART Bridge (COM?)" (for my device, linked above). That ? after COM is your needed COM port.
 Note that the GUI should automatically detect the correct COM port.
@@ -65,7 +65,7 @@ Select Run in the bottom left corner to flash the .hex file onto the Arduino. Wh
 
 #### Run
 
-To start a TAS file, simply start the clientTAS_GUI.py file (in the Arduino/utils folder). Make sure the pins of TX & RX on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it. You can also test the V-sync to check if everything is working correctly.
+To start a TAS file, simply start the clientTAS_GUI.py file (in the Arduino/utils folder). Make sure the TX & RX pins on your Arduino are connected correctly. Then connect your Arduino via USB to the Switch. After starting the program, a new window will appear - you will first need to synchronize with the switch, then load a TAS script and run it. You can also test the V-sync to check if everything is working correctly.
 
 If you have trouble setting up everything or running scripts, feel free to ask on the [Switch TAS discord server](https://discord.gg/KsqbP6k8Sj).
 
