@@ -1,5 +1,5 @@
 ## ArduinoTAS
-This project should emulate a controller with the Arduino and play TAS on the Nintendo Switch.
+This project should emulate a controller with an Arduino board and play TAS on the Nintendo Switch.
 
 Uses the LUFA library and reverse-engineering of the HORIPAD for Nintendo Switch for accurate controller emulation.
 
